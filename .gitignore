@@ -3,3 +3,8 @@ tags
 test
 models
 .idea
+
+.venv
+inputs
+summaries
+archive

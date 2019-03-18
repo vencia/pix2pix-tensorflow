@@ -39,10 +39,13 @@ parser.add_argument("--scale_size", type=int, default=286, help="scale images to
 parser.add_argument("--flip", dest="flip", action="store_true", help="flip images horizontally")
 parser.add_argument("--no_flip", dest="flip", action="store_false", help="don't flip images horizontally")
 parser.set_defaults(flip=True)
-parser.add_argument("--lr", type=float, default=0.0002, help="initial learning rate for adam")
+parser.add_argument("--lr_gen", type=float, default=0.0002, help="initial learning rate for adam")
+parser.add_argument("--lr_dis", type=float, default=0.00002, help="initial learning rate for adam")
 parser.add_argument("--beta1", type=float, default=0.5, help="momentum term of adam")
-parser.add_argument("--l1_weight", type=float, default=100.0, help="weight on L1 term for generator gradient")
+parser.add_argument("--l1_weight", type=float, default=0.0, help="weight on L1 term for generator gradient")
 parser.add_argument("--gan_weight", type=float, default=1.0, help="weight on GAN term for generator gradient")
+parser.add_argument("--decay_rate", type=float, default=0.8, help="decay rate")
+parser.add_argument("--decay_steps", type=int, default=100, help="decay steps")
 
 # export options
 parser.add_argument("--output_filetype", default="png", choices=["png", "jpeg"])
@@ -453,17 +456,19 @@ def create_model(inputs, targets):
         gen_loss_GAN = tf.reduce_mean(-tf.log(predict_fake + EPS))
         gen_loss_L1 = tf.reduce_mean(tf.abs(targets - outputs))
         gen_loss = gen_loss_GAN * a.gan_weight + gen_loss_L1 * a.l1_weight
-
+        
     with tf.name_scope("discriminator_train"):
         discrim_tvars = [var for var in tf.trainable_variables() if var.name.startswith("discriminator")]
-        discrim_optim = tf.train.AdamOptimizer(a.lr, a.beta1)
+        decayed_lr = tf.train.exponential_decay(a.lr_dis, tf.train.get_or_create_global_step(), a.decay_steps, a.decay_rate)
+        discrim_optim = tf.train.AdamOptimizer(decayed_lr, a.beta1)
         discrim_grads_and_vars = discrim_optim.compute_gradients(discrim_loss, var_list=discrim_tvars)
         discrim_train = discrim_optim.apply_gradients(discrim_grads_and_vars)
 
     with tf.name_scope("generator_train"):
         with tf.control_dependencies([discrim_train]):
             gen_tvars = [var for var in tf.trainable_variables() if var.name.startswith("generator")]
-            gen_optim = tf.train.AdamOptimizer(a.lr, a.beta1)
+            decayed_lr = tf.train.exponential_decay(a.lr_gen, tf.train.get_or_create_global_step(), a.decay_steps, 1.0)
+            gen_optim = tf.train.AdamOptimizer(decayed_lr, a.beta1)
             gen_grads_and_vars = gen_optim.compute_gradients(gen_loss, var_list=gen_tvars)
             gen_train = gen_optim.apply_gradients(gen_grads_and_vars)
 
@@ -540,6 +545,8 @@ def main():
     tf.set_random_seed(a.seed)
     np.random.seed(a.seed)
     random.seed(a.seed)
+
+    a.output_dir = a.output_dir + '_{}_{}_{}_{}_{}_{}'.format(a.max_epochs, a.lr_gen, a.lr_dis, a.l1_weight, a.gan_weight, a.decay_rate)
 
     if not os.path.exists(a.output_dir):
         os.makedirs(a.output_dir)
