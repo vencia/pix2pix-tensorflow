@@ -6,5 +6,6 @@ models
 
 .venv
 inputs
-summaries
-archive
+trainings
+trainings_archive
+predictions
