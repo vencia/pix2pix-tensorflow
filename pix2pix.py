@@ -16,7 +16,7 @@ import time
 parser = argparse.ArgumentParser()
 parser.add_argument("--input_dir", help="path to folder containing images")
 parser.add_argument("--mode", required=True, choices=["train", "test", "export"])
-parser.add_argument("--output_dir", required=True, help="where to put output files")
+parser.add_argument("--output_dir", default='trainings/', help="where to put output files")
 parser.add_argument("--seed", type=int)
 parser.add_argument("--checkpoint", default=None, help="directory with checkpoint to resume training from or use for testing")
 
@@ -546,7 +546,7 @@ def main():
     np.random.seed(a.seed)
     random.seed(a.seed)
 
-    a.output_dir = a.output_dir + '_{}_{}_{}_{}_{}_{}'.format(a.max_epochs, a.lr_gen, a.lr_dis, a.l1_weight, a.gan_weight, a.decay_rate)
+    a.output_dir = a.output_dir + a.input_dir.rsplit('/', 1)[1] + '_{}_{}_{}_{}_{}_{}'.format(a.max_epochs, a.lr_gen, a.lr_dis, a.l1_weight, a.gan_weight, a.decay_rate)
 
     if not os.path.exists(a.output_dir):
         os.makedirs(a.output_dir)
