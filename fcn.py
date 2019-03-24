@@ -18,46 +18,53 @@ import math
 import time
 
 from pix2pix_utils import augment, append_index, deprocess, save_images, load_examples
+from pix2pix import create_generator
 import fcn_utils as utils
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--input_dir", default='inputs/train/polygon_colsur_6_v3_s64',
-                    help="path to folder containing images")
-parser.add_argument("--mode", default='train', choices=["train", "test", "export"])
-parser.add_argument("--output_dir", default='trainings/fcn_', help="where to put output files")
-parser.add_argument("--seed", type=int)
-parser.add_argument("--checkpoint", default=None,
-                    help="directory with checkpoint to resume training from or use for testing")
 
-parser.add_argument("--max_steps", type=int, help="number of training steps (0 to disable)")
-parser.add_argument("--max_epochs", type=int, default=20, help="number of training epochs")
-parser.add_argument("--summary_freq", type=int, default=100, help="update summaries every summary_freq steps")
-parser.add_argument("--progress_freq", type=int, default=50, help="display progress every progress_freq steps")
-parser.add_argument("--trace_freq", type=int, default=0, help="trace execution every trace_freq steps")
-parser.add_argument("--display_freq", type=int, default=0,
-                    help="write current training images every display_freq steps")
-parser.add_argument("--save_freq", type=int, default=5000, help="save model every save_freq steps, 0 to disable")
+def parse_arguments():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--input_dir", default='inputs/train/polygon_colsur_6_v3_s64',
+                        help="path to folder containing images")
+    parser.add_argument("--mode", default='train', choices=["train", "test", "export"])
+    parser.add_argument("--net", default='gen', choices=['gen', 'vgg'])
+    parser.add_argument("--output_dir", default='trainings', help="where to put output files")
+    parser.add_argument("--seed", type=int)
+    parser.add_argument("--checkpoint", default=None,
+                        help="directory with checkpoint to resume training from or use for testing")
 
-parser.add_argument("--aspect_ratio", type=float, default=1.0, help="aspect ratio of output images (width/height)")
-parser.add_argument("--lab_colorization", action="store_true",
-                    help="split input image into brightness (A) and color (B)")
-parser.add_argument("--batch_size", type=int, default=1, help="number of images in batch")
-parser.add_argument("--which_direction", type=str, default="AtoB", choices=["AtoB", "BtoA"])
-parser.add_argument("--ngf", type=int, default=64, help="number of generator filters in first conv layer")
-parser.add_argument("--ndf", type=int, default=64, help="number of discriminator filters in first conv layer")
-parser.add_argument("--scale_size", type=int, default=256,
-                    help="scale images to this size before cropping to 256x256")
-parser.add_argument("--flip", dest="flip", action="store_true", help="flip images horizontally")
-parser.add_argument("--no_flip", dest="flip", action="store_false", help="don't flip images horizontally")
-parser.set_defaults(flip=True)
-parser.add_argument("--lr", type=float, default=0.0001, help="initial learning rate for adam")
-# parser.add_argument("--beta1", type=float, default=0.5, help="momentum term of adam")
-# parser.add_argument("--decay_rate", type=float, default=0.8, help="decay rate")
-# parser.add_argument("--decay_steps", type=int, default=100, help="decay steps")
+    parser.add_argument("--max_steps", type=int, help="number of training steps (0 to disable)")
+    parser.add_argument("--max_epochs", type=int, default=20, help="number of training epochs")
+    parser.add_argument("--summary_freq", type=int, default=100, help="update summaries every summary_freq steps")
+    parser.add_argument("--progress_freq", type=int, default=50, help="display progress every progress_freq steps")
+    parser.add_argument("--trace_freq", type=int, default=0, help="trace execution every trace_freq steps")
+    parser.add_argument("--display_freq", type=int, default=0,
+                        help="write current training images every display_freq steps")
+    parser.add_argument("--save_freq", type=int, default=5000, help="save model every save_freq steps, 0 to disable")
 
-# export options
-parser.add_argument("--output_filetype", default="png", choices=["png", "jpeg"])
-a = parser.parse_args()
+    parser.add_argument("--separable_conv", action="store_true", help="use separable convolutions in the generator")
+    parser.add_argument("--aspect_ratio", type=float, default=1.0, help="aspect ratio of output images (width/height)")
+    parser.add_argument("--lab_colorization", action="store_true",
+                        help="split input image into brightness (A) and color (B)")
+    parser.add_argument("--batch_size", type=int, default=1, help="number of images in batch")
+    parser.add_argument("--which_direction", type=str, default="AtoB", choices=["AtoB", "BtoA"])
+    parser.add_argument("--ngf", type=int, default=64, help="number of generator filters in first conv layer")
+    parser.add_argument("--ndf", type=int, default=64, help="number of discriminator filters in first conv layer")
+    parser.add_argument("--scale_size", type=int, default=256,
+                        help="scale images to this size before cropping to 256x256")
+    parser.add_argument("--flip", dest="flip", action="store_true", help="flip images horizontally")
+    parser.add_argument("--no_flip", dest="flip", action="store_false", help="don't flip images horizontally")
+    parser.set_defaults(flip=True)
+    parser.add_argument("--lr", type=float, default=0.0001, help="initial learning rate for adam")
+    # parser.add_argument("--beta1", type=float, default=0.5, help="momentum term of adam")
+    # parser.add_argument("--decay_rate", type=float, default=0.8, help="decay rate")
+    # parser.add_argument("--decay_steps", type=int, default=100, help="decay steps")
+
+    # export options
+    parser.add_argument("--output_filetype", default="png", choices=["png", "jpeg"])
+    a = parser.parse_args()
+    return a
+
 
 EPS = 1e-12
 CROP_SIZE = 256
@@ -65,7 +72,7 @@ CROP_SIZE = 256
 Examples = collections.namedtuple("Examples", "paths, inputs, targets, count, steps_per_epoch")
 Model = collections.namedtuple("Model", "outputs, loss, train")
 
-NUM_OF_CLASSESS = 3  # TODO: really???
+NUM_OF_CLASSES = 3  # TODO: really???
 
 
 def vgg_net(image):
@@ -163,14 +170,14 @@ def inference(inputs, keep_prob):
         #     utils.add_activation_summary(relu7)
         relu_dropout7 = tf.nn.dropout(relu7, keep_prob=keep_prob)
 
-        W8 = utils.weight_variable([1, 1, 4096, NUM_OF_CLASSESS], name="W8")
-        b8 = utils.bias_variable([NUM_OF_CLASSESS], name="b8")
+        W8 = utils.weight_variable([1, 1, 4096, NUM_OF_CLASSES], name="W8")
+        b8 = utils.bias_variable([NUM_OF_CLASSES], name="b8")
         conv8 = utils.conv2d_basic(relu_dropout7, W8, b8)
         # annotation_pred1 = tf.argmax(conv8, dimension=3, name="prediction1")
 
         # now to upscale to actual image size
         deconv_shape1 = image_net["pool4"].get_shape()
-        W_t1 = utils.weight_variable([4, 4, deconv_shape1[3].value, NUM_OF_CLASSESS], name="W_t1")
+        W_t1 = utils.weight_variable([4, 4, deconv_shape1[3].value, NUM_OF_CLASSES], name="W_t1")
         b_t1 = utils.bias_variable([deconv_shape1[3].value], name="b_t1")
         conv_t1 = utils.conv2d_transpose_strided(conv8, W_t1, b_t1, output_shape=tf.shape(image_net["pool4"]))
         fuse_1 = tf.add(conv_t1, image_net["pool4"], name="fuse_1")
@@ -182,9 +189,9 @@ def inference(inputs, keep_prob):
         fuse_2 = tf.add(conv_t2, image_net["pool3"], name="fuse_2")
 
         shape = tf.shape(inputs)
-        deconv_shape3 = tf.stack([shape[0], shape[1], shape[2], NUM_OF_CLASSESS])
-        W_t3 = utils.weight_variable([16, 16, NUM_OF_CLASSESS, deconv_shape2[3].value], name="W_t3")
-        b_t3 = utils.bias_variable([NUM_OF_CLASSESS], name="b_t3")
+        deconv_shape3 = tf.stack([shape[0], shape[1], shape[2], NUM_OF_CLASSES])
+        W_t3 = utils.weight_variable([16, 16, NUM_OF_CLASSES, deconv_shape2[3].value], name="W_t3")
+        b_t3 = utils.bias_variable([NUM_OF_CLASSES], name="b_t3")
         conv_t3 = utils.conv2d_transpose_strided(fuse_2, W_t3, b_t3, output_shape=deconv_shape3, stride=8)
 
         # annotation_pred = tf.argmax(conv_t3, dimension=3, name="prediction")
@@ -193,12 +200,12 @@ def inference(inputs, keep_prob):
     return conv_t3
 
 
-def create_model(inputs, targets, keep_probability):
-    logits = inference(inputs, keep_probability)
-    # loss = tf.reduce_mean((tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits,
-    #                                                                       labels=tf.squeeze(targets,
-    #                                                                                         squeeze_dims=[3]),
-    #                                                                       name="entropy")))
+def create_model(net, inputs, targets, keep_probability=1.0):
+    if net == 'vgg':
+        logits = inference(inputs, keep_probability)
+    else:
+        assert net == 'gen'
+        logits = create_generator(inputs, int(targets.get_shape()[-1]), a.ngf, a.separable_conv)
 
     loss = tf.reduce_mean(tf.abs(targets - logits))
 
@@ -222,7 +229,7 @@ def main():
     np.random.seed(a.seed)
     random.seed(a.seed)
 
-    a.output_dir += a.input_dir.rsplit('/', 1)[1] + '_{}_{}'.format(a.max_epochs, a.lr)
+    a.output_dir += '/' + a.net + '_' + a.input_dir.rsplit('/', 1)[1] + '_{}_{}'.format(a.max_epochs, a.lr)
 
     if not os.path.exists(a.output_dir):
         os.makedirs(a.output_dir)
@@ -254,7 +261,7 @@ def main():
     print("examples count = %d" % examples.count)
 
     # inputs and targets are [batch_size, height, width, channels]
-    model = create_model(examples.inputs, examples.targets, keep_probability=0.9)
+    model = create_model(a.net, examples.inputs, examples.targets, keep_probability=0.9)
 
     # undo colorization splitting on images that we use for display/output
     if a.lab_colorization:
@@ -412,4 +419,6 @@ def main():
                     break
 
 
-main()
+if __name__ == '__main__':
+    a = parse_arguments()
+    main()

@@ -15,47 +15,52 @@ import time
 
 from pix2pix_utils import augment, load_examples, deprocess, save_images, append_index, preprocess
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--input_dir", default='inputs/train/polygon_colsur_6_v3_s64',
-                    help="path to folder containing images")
-parser.add_argument("--mode", default='train', choices=["train", "test", "export"])
-parser.add_argument("--output_dir", default='trainings/', help="where to put output files")
-parser.add_argument("--seed", type=int)
-parser.add_argument("--checkpoint", default=None,
-                    help="directory with checkpoint to resume training from or use for testing")
 
-parser.add_argument("--max_steps", type=int, help="number of training steps (0 to disable)")
-parser.add_argument("--max_epochs", type=int, default=20, help="number of training epochs")
-parser.add_argument("--summary_freq", type=int, default=100, help="update summaries every summary_freq steps")
-parser.add_argument("--progress_freq", type=int, default=50, help="display progress every progress_freq steps")
-parser.add_argument("--trace_freq", type=int, default=0, help="trace execution every trace_freq steps")
-parser.add_argument("--display_freq", type=int, default=0,
-                    help="write current training images every display_freq steps")
-parser.add_argument("--save_freq", type=int, default=5000, help="save model every save_freq steps, 0 to disable")
+def parse_arguments():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--input_dir", default='inputs/train/polygon_colsur_6_v3_s64',
+                        help="path to folder containing images")
+    parser.add_argument("--mode", default='train', choices=["train", "test", "export"])
+    parser.add_argument("--output_dir", default='trainings', help="where to put output files")
+    parser.add_argument("--seed", type=int)
+    parser.add_argument("--checkpoint", default=None,
+                        help="directory with checkpoint to resume training from or use for testing")
 
-parser.add_argument("--separable_conv", action="store_true", help="use separable convolutions in the generator")
-parser.add_argument("--aspect_ratio", type=float, default=1.0, help="aspect ratio of output images (width/height)")
-parser.add_argument("--lab_colorization", action="store_true",
-                    help="split input image into brightness (A) and color (B)")
-parser.add_argument("--batch_size", type=int, default=1, help="number of images in batch")
-parser.add_argument("--which_direction", type=str, default="AtoB", choices=["AtoB", "BtoA"])
-parser.add_argument("--ngf", type=int, default=64, help="number of generator filters in first conv layer")
-parser.add_argument("--ndf", type=int, default=64, help="number of discriminator filters in first conv layer")
-parser.add_argument("--scale_size", type=int, default=286, help="scale images to this size before cropping to 256x256")
-parser.add_argument("--flip", dest="flip", action="store_true", help="flip images horizontally")
-parser.add_argument("--no_flip", dest="flip", action="store_false", help="don't flip images horizontally")
-parser.set_defaults(flip=True)
-parser.add_argument("--lr_gen", type=float, default=0.0002, help="initial learning rate for adam")
-parser.add_argument("--lr_dis", type=float, default=0.00002, help="initial learning rate for adam")
-parser.add_argument("--beta1", type=float, default=0.5, help="momentum term of adam")
-parser.add_argument("--l1_weight", type=float, default=1.0, help="weight on L1 term for generator gradient")
-parser.add_argument("--gan_weight", type=float, default=0.01, help="weight on GAN term for generator gradient")
-parser.add_argument("--decay_rate", type=float, default=0.98, help="decay rate")
-parser.add_argument("--decay_steps", type=int, default=100, help="decay steps")
+    parser.add_argument("--max_steps", type=int, help="number of training steps (0 to disable)")
+    parser.add_argument("--max_epochs", type=int, default=20, help="number of training epochs")
+    parser.add_argument("--summary_freq", type=int, default=100, help="update summaries every summary_freq steps")
+    parser.add_argument("--progress_freq", type=int, default=50, help="display progress every progress_freq steps")
+    parser.add_argument("--trace_freq", type=int, default=0, help="trace execution every trace_freq steps")
+    parser.add_argument("--display_freq", type=int, default=0,
+                        help="write current training images every display_freq steps")
+    parser.add_argument("--save_freq", type=int, default=5000, help="save model every save_freq steps, 0 to disable")
 
-# export options
-parser.add_argument("--output_filetype", default="png", choices=["png", "jpeg"])
-a = parser.parse_args()
+    parser.add_argument("--separable_conv", action="store_true", help="use separable convolutions in the generator")
+    parser.add_argument("--aspect_ratio", type=float, default=1.0, help="aspect ratio of output images (width/height)")
+    parser.add_argument("--lab_colorization", action="store_true",
+                        help="split input image into brightness (A) and color (B)")
+    parser.add_argument("--batch_size", type=int, default=1, help="number of images in batch")
+    parser.add_argument("--which_direction", type=str, default="AtoB", choices=["AtoB", "BtoA"])
+    parser.add_argument("--ngf", type=int, default=64, help="number of generator filters in first conv layer")
+    parser.add_argument("--ndf", type=int, default=64, help="number of discriminator filters in first conv layer")
+    parser.add_argument("--scale_size", type=int, default=286,
+                        help="scale images to this size before cropping to 256x256")
+    parser.add_argument("--flip", dest="flip", action="store_true", help="flip images horizontally")
+    parser.add_argument("--no_flip", dest="flip", action="store_false", help="don't flip images horizontally")
+    parser.set_defaults(flip=True)
+    parser.add_argument("--lr_gen", type=float, default=0.0002, help="initial learning rate for adam")
+    parser.add_argument("--lr_dis", type=float, default=0.00002, help="initial learning rate for adam")
+    parser.add_argument("--beta1", type=float, default=0.5, help="momentum term of adam")
+    parser.add_argument("--l1_weight", type=float, default=1.0, help="weight on L1 term for generator gradient")
+    parser.add_argument("--gan_weight", type=float, default=0.01, help="weight on GAN term for generator gradient")
+    parser.add_argument("--decay_rate", type=float, default=0.98, help="decay rate")
+    parser.add_argument("--decay_steps", type=int, default=100, help="decay steps")
+
+    # export options
+    parser.add_argument("--output_filetype", default="png", choices=["png", "jpeg"])
+    a = parser.parse_args()
+    return a
+
 
 EPS = 1e-12
 CROP_SIZE = 256
@@ -70,10 +75,10 @@ def discrim_conv(batch_input, out_channels, stride):
                             kernel_initializer=tf.random_normal_initializer(0, 0.02))
 
 
-def gen_conv(batch_input, out_channels):
+def gen_conv(batch_input, out_channels, separable_conv):
     # [batch, in_height, in_width, in_channels] => [batch, out_height, out_width, out_channels]
     initializer = tf.random_normal_initializer(0, 0.02)
-    if a.separable_conv:
+    if separable_conv:
         return tf.layers.separable_conv2d(batch_input, out_channels, kernel_size=4, strides=(2, 2), padding="same",
                                           depthwise_initializer=initializer, pointwise_initializer=initializer)
     else:
@@ -81,10 +86,10 @@ def gen_conv(batch_input, out_channels):
                                 kernel_initializer=initializer)
 
 
-def gen_deconv(batch_input, out_channels):
+def gen_deconv(batch_input, out_channels, separable_conv):
     # [batch, in_height, in_width, in_channels] => [batch, out_height, out_width, out_channels]
     initializer = tf.random_normal_initializer(0, 0.02)
-    if a.separable_conv:
+    if separable_conv:
         _b, h, w, _c = batch_input.shape
         resized_input = tf.image.resize_images(batch_input, [h * 2, w * 2],
                                                method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
@@ -112,40 +117,40 @@ def batchnorm(inputs):
                                          gamma_initializer=tf.random_normal_initializer(1.0, 0.02))
 
 
-def create_generator(generator_inputs, generator_outputs_channels):
+def create_generator(generator_inputs, generator_outputs_channels, ngf, separable_conv):
     layers = []
 
     # encoder_1: [batch, 256, 256, in_channels] => [batch, 128, 128, ngf]
     with tf.variable_scope("encoder_1"):
-        output = gen_conv(generator_inputs, a.ngf)
+        output = gen_conv(generator_inputs, ngf, separable_conv)
         layers.append(output)
 
     layer_specs = [
-        a.ngf * 2,  # encoder_2: [batch, 128, 128, ngf] => [batch, 64, 64, ngf * 2]
-        a.ngf * 4,  # encoder_3: [batch, 64, 64, ngf * 2] => [batch, 32, 32, ngf * 4]
-        a.ngf * 8,  # encoder_4: [batch, 32, 32, ngf * 4] => [batch, 16, 16, ngf * 8]
-        a.ngf * 8,  # encoder_5: [batch, 16, 16, ngf * 8] => [batch, 8, 8, ngf * 8]
-        a.ngf * 8,  # encoder_6: [batch, 8, 8, ngf * 8] => [batch, 4, 4, ngf * 8]
-        a.ngf * 8,  # encoder_7: [batch, 4, 4, ngf * 8] => [batch, 2, 2, ngf * 8]
-        a.ngf * 8,  # encoder_8: [batch, 2, 2, ngf * 8] => [batch, 1, 1, ngf * 8]
+        ngf * 2,  # encoder_2: [batch, 128, 128, ngf] => [batch, 64, 64, ngf * 2]
+        ngf * 4,  # encoder_3: [batch, 64, 64, ngf * 2] => [batch, 32, 32, ngf * 4]
+        ngf * 8,  # encoder_4: [batch, 32, 32, ngf * 4] => [batch, 16, 16, ngf * 8]
+        ngf * 8,  # encoder_5: [batch, 16, 16, ngf * 8] => [batch, 8, 8, ngf * 8]
+        ngf * 8,  # encoder_6: [batch, 8, 8, ngf * 8] => [batch, 4, 4, ngf * 8]
+        ngf * 8,  # encoder_7: [batch, 4, 4, ngf * 8] => [batch, 2, 2, ngf * 8]
+        ngf * 8,  # encoder_8: [batch, 2, 2, ngf * 8] => [batch, 1, 1, ngf * 8]
     ]
 
     for out_channels in layer_specs:
         with tf.variable_scope("encoder_%d" % (len(layers) + 1)):
             rectified = lrelu(layers[-1], 0.2)
             # [batch, in_height, in_width, in_channels] => [batch, in_height/2, in_width/2, out_channels]
-            convolved = gen_conv(rectified, out_channels)
+            convolved = gen_conv(rectified, out_channels, separable_conv)
             output = batchnorm(convolved)
             layers.append(output)
 
     layer_specs = [
-        (a.ngf * 8, 0.5),  # decoder_8: [batch, 1, 1, ngf * 8] => [batch, 2, 2, ngf * 8 * 2]
-        (a.ngf * 8, 0.5),  # decoder_7: [batch, 2, 2, ngf * 8 * 2] => [batch, 4, 4, ngf * 8 * 2]
-        (a.ngf * 8, 0.5),  # decoder_6: [batch, 4, 4, ngf * 8 * 2] => [batch, 8, 8, ngf * 8 * 2]
-        (a.ngf * 8, 0.0),  # decoder_5: [batch, 8, 8, ngf * 8 * 2] => [batch, 16, 16, ngf * 8 * 2]
-        (a.ngf * 4, 0.0),  # decoder_4: [batch, 16, 16, ngf * 8 * 2] => [batch, 32, 32, ngf * 4 * 2]
-        (a.ngf * 2, 0.0),  # decoder_3: [batch, 32, 32, ngf * 4 * 2] => [batch, 64, 64, ngf * 2 * 2]
-        (a.ngf, 0.0),  # decoder_2: [batch, 64, 64, ngf * 2 * 2] => [batch, 128, 128, ngf * 2]
+        (ngf * 8, 0.5),  # decoder_8: [batch, 1, 1, ngf * 8] => [batch, 2, 2, ngf * 8 * 2]
+        (ngf * 8, 0.5),  # decoder_7: [batch, 2, 2, ngf * 8 * 2] => [batch, 4, 4, ngf * 8 * 2]
+        (ngf * 8, 0.5),  # decoder_6: [batch, 4, 4, ngf * 8 * 2] => [batch, 8, 8, ngf * 8 * 2]
+        (ngf * 8, 0.0),  # decoder_5: [batch, 8, 8, ngf * 8 * 2] => [batch, 16, 16, ngf * 8 * 2]
+        (ngf * 4, 0.0),  # decoder_4: [batch, 16, 16, ngf * 8 * 2] => [batch, 32, 32, ngf * 4 * 2]
+        (ngf * 2, 0.0),  # decoder_3: [batch, 32, 32, ngf * 4 * 2] => [batch, 64, 64, ngf * 2 * 2]
+        (ngf, 0.0),  # decoder_2: [batch, 64, 64, ngf * 2 * 2] => [batch, 128, 128, ngf * 2]
     ]
 
     num_encoder_layers = len(layers)
@@ -161,7 +166,7 @@ def create_generator(generator_inputs, generator_outputs_channels):
 
             rectified = tf.nn.relu(input)
             # [batch, in_height, in_width, in_channels] => [batch, in_height*2, in_width*2, out_channels]
-            output = gen_deconv(rectified, out_channels)
+            output = gen_deconv(rectified, out_channels, separable_conv)
             output = batchnorm(output)
 
             if dropout > 0.0:
@@ -173,7 +178,7 @@ def create_generator(generator_inputs, generator_outputs_channels):
     with tf.variable_scope("decoder_1"):
         input = tf.concat([layers[-1], layers[0]], axis=3)
         rectified = tf.nn.relu(input)
-        output = gen_deconv(rectified, generator_outputs_channels)
+        output = gen_deconv(rectified, generator_outputs_channels, separable_conv)
         output = tf.tanh(output)
         layers.append(output)
 
@@ -216,7 +221,7 @@ def create_model(inputs, targets):
 
     with tf.variable_scope("generator"):
         out_channels = int(targets.get_shape()[-1])
-        outputs = create_generator(inputs, out_channels)
+        outputs = create_generator(inputs, out_channels, a.ngf, a.separable_conv)
 
     # create two copies of discriminator, one for real pairs and one for fake pairs
     # they share the same underlying variables
@@ -286,8 +291,12 @@ def main():
     np.random.seed(a.seed)
     random.seed(a.seed)
 
-    a.output_dir += a.input_dir.rsplit('/', 1)[1] + '_{}_{}_{}_{}_{}_{}'.format(a.max_epochs, a.lr_gen, a.lr_dis,
-                                                                                a.l1_weight, a.gan_weight, a.decay_rate)
+    if a.mode == 'train':
+        a.output_dir += '/' + a.input_dir.rsplit('/', 1)[1] + '_{}_{}_{}_{}_{}_{}'.format(a.max_epochs, a.lr_gen,
+                                                                                          a.lr_dis, a.l1_weight,
+                                                                                          a.gan_weight, a.decay_rate)
+    else:
+        a.output_dir += '/' + a.checkpoint.rsplit('/', 1)[1]
 
     if not os.path.exists(a.output_dir):
         os.makedirs(a.output_dir)
@@ -333,7 +342,7 @@ def main():
         batch_input = tf.expand_dims(input_image, axis=0)
 
         with tf.variable_scope("generator"):
-            batch_output = deprocess(create_generator(preprocess(batch_input), 3))
+            batch_output = deprocess(create_generator(preprocess(batch_input), 3, a.ngf, a.separable_conv))
 
         output_image = tf.image.convert_image_dtype(batch_output, dtype=tf.uint8)[0]
         if a.output_filetype == "png":
@@ -553,4 +562,6 @@ def main():
                     break
 
 
-main()
+if __name__ == '__main__':
+    a = parse_arguments()
+    main()
