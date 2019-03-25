@@ -489,13 +489,39 @@ def main():
             start = time.time()
             max_steps = min(examples.steps_per_epoch, max_steps)
             for step in range(max_steps):
-                results = sess.run(display_fetches)
-                filesets = save_images(fetches=results, output_dir=a.output_dir)
+                def should(freq):
+                    return freq > 0 and ((step + 1) % freq == 0 or step == max_steps - 1)
+
+                fetches = {
+                    "train": model.train,
+                    "global_step": sv.global_step,
+                }
+
+                if should(a.progress_freq):
+                    fetches["discrim_loss"] = model.discrim_loss
+                    fetches["gen_loss_GAN"] = model.gen_loss_GAN
+                    fetches["gen_loss_L1"] = model.gen_loss_L1
+
+                if should(a.summary_freq):
+                    fetches["summary"] = sv.summary_op
+
+                fetches["display"] = display_fetches
+
+                results = sess.run(fetches)
+
+                if should(a.summary_freq):
+                    print("recording summary")
+                    sv.summary_writer.add_summary(results["summary"], results["global_step"])
+
+                filesets = save_images(fetches=results['display'], output_dir=a.output_dir)
                 for i, f in enumerate(filesets):
                     print("evaluated image", f["name"])
                 index_path = append_index(filesets=filesets, output_dir=a.output_dir)
             print("wrote index at", index_path)
             print("rate", (time.time() - start) / max_steps)
+            print("discrim_loss", results["discrim_loss"])
+            print("gen_loss_GAN", results["gen_loss_GAN"])
+            print("gen_loss_L1", results["gen_loss_L1"])
         else:
             # training
             start = time.time()
